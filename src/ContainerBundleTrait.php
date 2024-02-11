@@ -10,6 +10,10 @@
 namespace Zelasli\Core;
 
 use Closure;
+use ReflectionClass;
+use ReflectionException;
+use ReflectionNamedType;
+use ReflectionUnionType;
 use Zelasli\Container\ComponentNotFoundException;
 use Zelasli\Container\ContainerException;
 
@@ -146,8 +150,119 @@ trait ContainerBundleTrait
 
     public function make(string $identifier, array $parameters = []): mixed
     {
-        // TODO: retrun instance component by its identifier or relove one and
-        // retrun it.
+
+        if ($this->isAlias($alias = $identifier) && 
+        isset($this->components[$this->aliases[$alias]])) {
+            return $this->components[$this->aliases[$alias]];
+        }
+
+        if (isset($this->components[$identifier])) {
+            return $this->components[$identifier];
+        }
+        
+        try {
+            $component = $this->get($identifier);
+        } catch (ComponentNotFoundException $cne) {
+            throw $cne;
+        }
+
+        try {
+            $reflectionClass = new ReflectionClass($component);
+            
+            $instance = $this->resolve($reflectionClass, $parameters);
+
+            return $this->components[$reflectionClass->getName()] = $instance;
+        } catch (ContainerException $ce) {
+            throw $ce;
+        } catch (ReflectionException $re) {
+            throw new ContainerException($re->getMessage(), $re->getCode(), $re);
+        }
+    }
+
+    /**
+     * Resolve component or dependency by reflection to auto-wire dependencies
+     * 
+     * @param string $identifier
+     * @param array $parameters
+     * 
+     * @return mixed
+     */
+    protected function resolve(
+        ReflectionClass $reflectionClass,
+        array $parameters
+    ): mixed {
+        if (!$reflectionClass->isInstantiable()) {
+            throw new ContainerException(
+                "The class {$reflectionClass->getName()} is not instantiable"
+            );
+        }
+        $component = $reflectionClass->getName();
+        $reflectionMethod = $reflectionClass->getConstructor();
+        $dependencies = $reflectionMethod ? 
+            $reflectionMethod->getParameters() : [];
+
+        if (empty($dependencies)) {
+            return new $component();
+        }
+        
+        $result = [];
+        foreach ($dependencies as $dependency) {
+            $type = $dependency->getType();
+            if ($type instanceof ReflectionUnionType) {
+                throw new ContainerException(
+                    "Argument of union type not supported"
+                );
+            }
+            if ($type !== null && !$type instanceof ReflectionNamedType) {
+                throw new ContainerException(
+                    "Unsupported argument type:" . get_class($type)
+                );
+            }elseif (!$type instanceof ReflectionNamedType) {
+                throw new ContainerException(
+                    "Parameter ({$dependency->getName()}) in {$component}".
+                    "::__construct() must be specified"
+                );
+            }
+
+            $dependencyName = trim((string) $type, '?');
+            $isClass = (
+                $type instanceof ReflectionNamedType && 
+                !$type->isBuiltin()
+            );
+
+            switch (true) {
+                // match postional argument
+                case array_key_exists($dependency->getPosition(), $parameters):
+                    $result[] = $parameters[$dependency->getPosition()];
+                    break;
+                // match named argument
+                case array_key_exists($dependency->getName(), $parameters):
+                    $result[] = $parameters[$dependency->getName()];
+                    break;
+                // auto-wire
+                case $isClass:
+                    $result[] = $this->has($dependencyName) ?
+                    $this->make($dependencyName) :
+                    $this->resolve(new ReflectionClass($dependencyName), []);
+                    break;
+                // is optional and has override? set it.
+                case $dependency->isOptional() && (
+                    array_key_exists($dependency->getPosition(), $parameters) ||
+                    array_key_exists($dependency->getName(), $parameters)
+                ):
+                    $result[] = $parameters[$dependency->getPosition()] ??
+                    $parameters[$dependency->getName()];
+                    break;
+                default:
+                    throw new ContainerException(
+                        "Provide value for ({$dependency->getName()}) ".
+                        "argument in {$component}::__construct()"
+                    );
+                    break;
+            }
+        }
+
+        return new $component(...$result);
     }
 
     public function singleton(
