@@ -12,6 +12,22 @@ namespace Zelasli;
 
 class Helpers
 {
+    private static $settings = null;
+
+    /**
+     * Initialize helper with settings
+     *
+     * @param array $settings
+     *
+     * @return void
+     */
+    public static function init($settings)
+    {
+        if (!self::$settings) {
+            self::$settings = $settings;
+        }
+    }
+
     /**
      * Inspect a variable
      *
