@@ -42,6 +42,21 @@ class FrameworkKernel {
         return self::$static;
     }
 
+    public function getRequest()
+    {
+        return $this->request;
+    }
+
+    public function getRouter()
+    {
+        return $this->router;
+    }
+
+    public function getSettings()
+    {
+        return $this->settings;
+    }
+
     public function initialize()
     {
         Session::start();
@@ -118,8 +133,19 @@ class FrameworkKernel {
         }
     }
 
+    /**
+     * Kick-up application
+     *
+     * @param string $appClass
+     *
+     * @return \Zelasli\Application\KernelInterface
+     */
     public function startApp($appClass)
     {
-        return new $appClass($this);
+        $app = new $appClass($this);
+
+        $app->initialize();
+
+        return $app;
     }
 }
