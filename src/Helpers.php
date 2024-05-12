@@ -60,5 +60,6 @@ class Helpers
         echo "<pre>";
         var_dump($value);
         echo "</pre>";
+        exit(0);
     }
 }
