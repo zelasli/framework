@@ -142,9 +142,9 @@ class FrameworkKernel {
      */
     public function startApp($appClass)
     {
-        Helpers::init($this->settings);
-
         $app = new $appClass($this);
+        
+        Helpers::init($app, $this->settings);
 
         $app->initialize();
 

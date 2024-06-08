@@ -9,21 +9,55 @@
 
 namespace Zelasli;
 
+use Zelasli\Application\KernelInterface;
+use Zelasli\Application\View;
+use Zelasli\Http\Headers;
+use Zelasli\Http\Message\Response;
+use Zelasli\Http\Status;
 
 class Helpers
 {
+    private static ?KernelInterface $app = null;
+
     private static $settings = null;
+
+    /**
+     * Abort the script and send a response to the client.
+     *
+     * @param int $code
+     * @param string $message
+     * @param array $headers
+     *
+     * @return void
+     */
+    public static function abort($code, $message = "", array $headers = [])
+    {
+        http_response_code($code);
+
+        foreach ($headers as $header => $value) {
+            header("$header: $value");
+        }
+        echo "$message";
+        exit;
+    }
+
+    public static function app()
+    {
+        return self::$app;
+    }
 
     /**
      * Initialize helper with settings
      *
+     * @param \Zelasli\Application\KernelInterface $app
      * @param array $settings
      *
      * @return void
      */
-    public static function init($settings)
+    public static function init($app, $settings)
     {
-        if (!self::$settings) {
+        if (!self::$app) {
+            self::$app = $app;
             self::$settings = $settings;
         }
     }
@@ -61,5 +95,34 @@ class Helpers
         var_dump($value);
         echo "</pre>";
         exit(0);
+    }
+
+    public static function response(
+        $content,
+        $contentType = 'text/html',
+        $status = Status::OK,
+        $headers = [],
+        $charset = 'utf8'
+    ) {
+        if (is_array($headers)) {
+            $headers = new Headers($headers);
+        } elseif (!$headers instanceof Headers) {
+            $headers = [];
+        }
+
+        return new Response(
+            content: $content,
+            contentType: $contentType,
+            status: $status,
+            headers: $headers,
+            charset: $charset
+        );
+    }
+
+    public static function view($name, $data = []) {
+        $template = new View($name, self::$settings['TEMPLATES_DIR']);
+        $template->set($data);
+
+        return $template;
     }
 }

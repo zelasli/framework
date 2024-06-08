@@ -11,6 +11,7 @@ namespace Zelasli\Application;
 
 use Zelasli\FrameworkKernel;
 use Zelasli\Helpers;
+use Zelasli\Routing\Route;
 
 trait KernelTrait
 {
@@ -21,7 +22,9 @@ trait KernelTrait
      */
     protected ?FrameworkKernel $container = null;
 
-    protected ControllerInterface $controller;
+    protected ?Route $matchedRoute;
+
+    protected object $controller;
 
     /**
      * Constructor
@@ -43,11 +46,28 @@ trait KernelTrait
     {
         $request = $this->container->getRequest();
         $router = $this->container->getRouter();
-        $route = $router->findRouteByUrl($request->getRequestTarget());
-        $controllerClass = $route->getClass();
-        $this->controller = new $controllerClass($request);
+        $this->matchedRoute = $router->findRouteByUrl(
+            $request->getRequestTarget()
+        );
 
-        Helpers::inspectDie($this->controller);
+        if ($this->matchedRoute) {
+            $controllerClass = $this->matchedRoute->getClass();
+            $this->controller = new $controllerClass($request);
+
+            if ($this->controller instanceof ControllerInterface) {
+                $this->controller->initialize();
+                $this->controller->dispatch(
+                    $this->matchedRoute->getAction(),
+                    $this->matchedRoute->getParams()
+                );
+            } else {
+                $this->controller->{$this->matchedRoute->getAction()}(
+                    ...$this->matchedRoute->getParams()
+                );
+            }
+        } else {
+            Helpers::abort(404, "Not Found");
+        }
 
         return $this;
     }
@@ -63,7 +83,7 @@ trait KernelTrait
     }
 
     /**
-     * Register application servces
+     * Register application services
      *
      * @return void
      */
@@ -71,7 +91,10 @@ trait KernelTrait
 
     final public function terminate(): void
     {
-        // $this->controller->doSend();
+        if ($this->controller instanceof ControllerInterface) {
+            $this->controller->doSend();
+        }
+
         $this->halt();
     }
 }
