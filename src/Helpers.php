@@ -46,6 +46,28 @@ class Helpers
         return self::$app;
     }
 
+    public static function config($params, $default = null)
+    {
+        if (empty($params)) {
+            return null;
+        }
+
+        if (is_string($params)) {
+            $params = explode(".", $params);
+        } elseif (!is_array($params)) {
+            return null;
+        }
+
+        $config = self::$app->getConfig('*') ?? [];
+        $data = array_change_key_case($config, CASE_LOWER);
+
+        foreach ($params as $param) {
+            $data = $data[strtolower($param)] ?? $default;
+        }
+
+        return $data;
+    }
+
     /**
      * Initialize helper with settings
      *
@@ -117,6 +139,20 @@ class Helpers
             headers: $headers,
             charset: $charset
         );
+    }
+
+    public static function varPath($path = "/")
+    {
+        $baseDir = self::$app->getConfig('BASE_DIR');
+        $varDir = rtrim($baseDir, '/') . '/var';
+
+        if ($baseDir) {
+            return $path == '/' ?
+                rtrim($varDir, '/') . $path :
+                rtrim($varDir, '/') . DIRECTORY_SEPARATOR . ltrim($path, '/');
+        } else {
+            return null;
+        }
     }
 
     public static function view($name, $data = []) {

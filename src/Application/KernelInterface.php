@@ -11,6 +11,15 @@ namespace Zelasli\Application;
 
 interface KernelInterface {
     /**
+     * Retrieve configuration settings data
+     *
+     * @param array|string $params
+     *
+     * @return mixed
+     */
+    public function getConfig($params = null): mixed;
+
+    /**
      * Stopping the Application and exit the program
      *
      * @return void

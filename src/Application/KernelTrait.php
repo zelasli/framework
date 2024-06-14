@@ -37,6 +37,34 @@ trait KernelTrait
         $this->container = $container;
     }
 
+    public function getConfig($params = null): mixed
+    {
+        if (empty($params)) {
+            return null;
+        }
+
+        if ($params == '*') {
+            return $this->container->getSettings();
+        }
+
+        if (is_string($params)) {
+            $params = explode(".", $params);
+        } elseif (!is_array($params)) {
+            return null;
+        }
+
+        $config = $this->container->getSettings();
+        foreach($params as $param) {
+            if (isset($config[$param])) {
+                $config = $config[$param];
+            } else {
+                return null;
+            }
+        }
+
+        return $config;
+    }
+
     public function halt(): void
     {
         exit(0);
